@@ -20,34 +20,34 @@ jobs:
         override: true
         components: rustfmt, clippy
 
-    - name: Import GPG key
-      id: import_gpg
-      uses: crazy-max/ghaction-import-gpg@v5
-      with:
-        gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-        passphrase: ${{ secrets.GPG_PASSPHRASE }}
+    # - name: Import GPG key
+      # id: import_gpg
+      # uses: crazy-max/ghaction-import-gpg@v5
+      # with:
+        # gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+        # passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-    - name: List Keys
-      run: gpg -K
+    # - name: List Keys
+      # run: gpg -K
 
     - name: Build
       run: |
         cargo build --release
 
-    - name: Code Sign
-      uses: dlemstra/code-sign-action@v1
-      with:
-        certificate: '${{ secrets.CODE_SIGN_CERTIFICATE }}'
-        password: '${{ secrets.CODE_SIGN_PASSWORD }}'
-        recursive: false
-        files: |
-          target/release/deucalion.dll
+    # - name: Code Sign
+      # uses: dlemstra/code-sign-action@v1
+      # with:
+        # certificate: '${{ secrets.CODE_SIGN_CERTIFICATE }}'
+        # password: '${{ secrets.CODE_SIGN_PASSWORD }}'
+        # recursive: false
+        # files: |
+          # target/release/deucalion.dll
 
-    - name: SHA256Sum and GPG Sign
-      run: |
-        sha256sum target/release/deucalion.dll > deucalion.sha256sum
-        gpg --output deucalion.sha256sum.asc --clearsign deucalion.sha256sum
-        cat deucalion.sha256sum.asc
+    # - name: SHA256Sum and GPG Sign
+      # run: |
+        # sha256sum target/release/deucalion.dll > deucalion.sha256sum
+        # gpg --output deucalion.sha256sum.asc --clearsign deucalion.sha256sum
+        # cat deucalion.sha256sum.asc
 
     - name: Upload artifact
       uses: actions/upload-artifact@v3
@@ -55,8 +55,6 @@ jobs:
         name: deucalion
         path: |
           target/release/deucalion.dll
-          deucalion.sha256sum
-          deucalion.sha256sum.asc
 
   release:
     runs-on: ubuntu-latest
@@ -73,6 +71,3 @@ jobs:
         draft: true
         files: |
           deucalion/target/release/deucalion.dll
-          deucalion/deucalion.sha256sum
-          deucalion/deucalion.sha256sum.asc
-
