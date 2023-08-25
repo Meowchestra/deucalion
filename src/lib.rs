@@ -4,7 +4,7 @@ use std::panic;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-use simplelog::{self, LevelFilter, WriteLogger};
+//use simplelog::{self, LevelFilter, WriteLogger};
 #[cfg(windows)]
 use winapi::shared::minwindef::*;
 use winapi::um::libloaderapi;
@@ -34,7 +34,7 @@ mod server;
 use log::{error, info};
 
 #[cfg(debug_assertions)]
-use simplelog::{CombinedLogger, SimpleLogger};
+//use simplelog::{CombinedLogger, SimpleLogger};
 
 const RECV_SIG: &str = "E8 $ { ' } 4C 8B 43 10 41 8B 40 18";
 const SEND_SIG: &str = "E8 $ { ' } 8B 53 2C 48 8D 8B";
@@ -170,7 +170,7 @@ fn pause() {
     let _ = io::stdin().read(&mut [0u8]).unwrap();
 }
 
-fn logging_setup() -> Result<()> {
+/*fn logging_setup() -> Result<()> {
     let secs_since_epoch = SystemTime::now()
         .duration_since(SystemTime::UNIX_EPOCH)?
         .as_secs();
@@ -197,15 +197,15 @@ fn logging_setup() -> Result<()> {
     }
 
     Ok(())
-}
+}*/
 
 unsafe extern "system" fn main(dll_base_addr: LPVOID) -> u32 {
     #[cfg(debug_assertions)]
     consoleapi::AllocConsole();
 
-    if let Err(e) = logging_setup() {
+    /*if let Err(e) = logging_setup() {
         println!("Error initializing logger: {e}");
-    }
+    }*/
 
     let result = panic::catch_unwind(|| {
         if let Err(e) = main_with_result() {
