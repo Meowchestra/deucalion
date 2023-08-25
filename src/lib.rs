@@ -4,7 +4,7 @@ use std::panic;
 use std::path::PathBuf;
 use std::time::SystemTime;
 
-//use simplelog::{self, LevelFilter, WriteLogger};
+use simplelog::{self, LevelFilter, WriteLogger};
 #[cfg(windows)]
 use winapi::shared::minwindef::*;
 use winapi::um::libloaderapi;
@@ -34,7 +34,7 @@ mod server;
 use log::{error, info};
 
 #[cfg(debug_assertions)]
-//use simplelog::{CombinedLogger, SimpleLogger};
+use simplelog::{CombinedLogger, SimpleLogger};
 
 const RECV_SIG: &str = "E8 $ { ' } 4C 8B 43 10 41 8B 40 18";
 const SEND_SIG: &str = "E8 $ { ' } 8B 53 2C 48 8D 8B";
