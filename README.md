@@ -17,6 +17,12 @@ High-performance Windows library for capturing decoded FFXIV packets. This
 library is fairly limited in scope and it is intended to be used in conjunction
 with other packet handling applications.
 
+## Compatibility
+
+Deucalion only supports 64-bit versions of FFXIV using DX11.
+
+Version 1.0.0 is compatible with Dawntrail (FFXIV 7.0+). Older FFXIV client versions should continue to use version 0.9.x.
+
 ## Features
 
   - This library can be used as a sniffer on the FFXIV packet protocol layer
@@ -242,7 +248,7 @@ to the subscriber.
 
 ```c
 // Deucalion: Connection established message.
-Payload { OP: OP.Debug, CHANNEL: 9000, DATA: u8"SERVER HELLO. HOOK STATUS: RECV ON. SEND ON. SEND_LOBBY ON." }
+Payload { OP: OP.Debug, CHANNEL: 9000, DATA: u8"SERVER HELLO. VERSION: 1.0.0. HOOK STATUS: RECV ON. SEND ON. SEND_LOBBY ON." }
 // Deucalion: Data streamed to all subscribers
 Payload { OP: OP.Recv, CHANNEL: 1, DATA: deucalion_segment }
 ...
@@ -251,7 +257,7 @@ Payload { OP: OP.Recv, CHANNEL: 1, DATA: deucalion_segment }
 ### Example when Deucalion requires sigs
 ```c
 // Deucalion: Connection established message.
-Payload { OP: OP.Debug, CHANNEL: 9000, DATA: u8"SERVER HELLO. HOOK STATUS: RECV OFF. SEND OFF. SEND_LOBBY OFF." }
+Payload { OP: OP.Debug, CHANNEL: 9000, DATA: u8"SERVER HELLO. VERSION: 1.0.0. HOOK STATUS: RECV OFF. SEND OFF. SEND_LOBBY OFF." }
 // Subscriber: Request with an invalid sig.
 Payload { OP: OP.Recv, CHANNEL: 1, DATA: u8"invalid sig" }
 // Deucalion: Response with an invalid sig error.
@@ -271,7 +277,7 @@ If the Recv hook is already initialized, then the following scenario can happen:
 
 ```c
 // Deucalion: Connection established message.
-Payload { OP: OP.Debug, CHANNEL: 9000, DATA: u8"SERVER HELLO. RECV ON. SEND ON. SEND_LOBBY ON." }
+Payload { OP: OP.Debug, CHANNEL: 9000, DATA: u8"SERVER HELLO. VERSION: 1.0.0. RECV ON. SEND ON. SEND_LOBBY ON." }
 // Deucalion: Data streamed to all subscribers
 Payload { OP: OP.Recv, CHANNEL: 1, DATA: deucalion_segment }
 
