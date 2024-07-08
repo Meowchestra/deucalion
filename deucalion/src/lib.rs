@@ -33,7 +33,7 @@ mod server;
 use log::{error, info};
 
 #[cfg(debug_assertions)]
-use simplelog::{CombinedLogger, SimpleLogger};
+use simplelog::{CombinedLogger};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
