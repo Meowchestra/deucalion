@@ -1,8 +1,7 @@
-use std::fs;
 use std::io::{self, Read};
 use std::panic;
 
-use simplelog::{LevelFilter};
+use simplelog::{LevelFilter, SimpleLogger};
 use w32module::drop_ref_count_to_one;
 #[cfg(windows)]
 use winapi::shared::minwindef::*;
