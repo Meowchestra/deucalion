@@ -13,8 +13,8 @@ keywords = ["ffxiv", "windows", "dll-injection", "dll"]
 
 [dependencies]
 deucalion = { path = "../deucalion" }
-tokio = { version = "1.38.0", features = ["io-util", "sync", "rt"] }
-tokio-util = { version = "0.7.11", features = ["codec", "compat"] }
+tokio = { version = "1.44.1", features = ["io-util", "sync", "rt"] }
+tokio-util = { version = "0.7.14", features = ["codec", "compat"] }
 tokio-retry = "0.3"
 futures = "0.3"
 dll-syringe = { git = "https://github.com/OpenByteDev/dll-syringe", rev = "c8762b1" }
