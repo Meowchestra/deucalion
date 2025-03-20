@@ -10,16 +10,18 @@ env:
 
 jobs:
   build:
-    runs-on: windows-2019
+    runs-on: windows-latest
     steps:
     - uses: actions/checkout@v4
+
     - name: Install latest nightly
-      uses: actions-rs/toolchain@v1
+      uses: dtolnay/rust-toolchain@master
       with:
         toolchain: nightly
-        override: true
-        components: rustfmt, clippy
+        components: clippy, rustfmt
+
     - name: Build
       run: cargo build --release
+
     # - name: Build bcryptprimitives.rs shim
       # run: rustc shims/bcryptprimitives.rs -Copt-level=3 -Clto=fat --out-dir target/release
