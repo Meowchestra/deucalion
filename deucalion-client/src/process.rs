@@ -27,14 +27,15 @@ use winapi::{
         },
     },
 };
+use sysinfo::{System, ProcessesToUpdate};
 
 pub fn find_all_pids_by_name(target_exe: &str) -> Vec<usize> {
-    let mut system = sysinfo::System::new();
-    system.refresh_processes();
+    let mut system = System::new();
+    system.refresh_processes(ProcessesToUpdate::All, true);
     system
         .processes()
         .values()
-        .filter(move |process| process.name().contains(target_exe))
+        .filter(move |process| process.name().to_string_lossy().contains(target_exe))
         .map(|process| process.pid().into())
         .collect()
 }
