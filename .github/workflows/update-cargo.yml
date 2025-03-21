@@ -25,7 +25,7 @@ jobs:
         run: cargo install cargo-edit
 
       - name: Upgrade Dependencies in Cargo.toml
-        run: cargo upgrade
+        run: cargo upgrade --verbose
 
       - name: Check for changes
         id: check_changes
