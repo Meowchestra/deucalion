@@ -31,8 +31,7 @@ jobs:
       # run: gpg -K
 
     - name: Build
-      run: |
-        cargo build --release
+      run: cargo build --release
 
     # - name: Build bcryptprimitives.rs shim
       # run: rustc shims/bcryptprimitives.rs -Copt-level=3 -Clto=fat --out-dir target/release
