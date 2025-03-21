@@ -82,8 +82,8 @@ jobs:
         name: deucalion
         path: artifacts
 
-    - name: Extract artifact
-      run: unzip artifacts/deucalion.zip -d artifacts
+    - name: Check contents
+      run: ls -R artifacts
 
     - name: Release
       uses: softprops/action-gh-release@v2
