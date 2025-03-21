@@ -86,4 +86,4 @@ jobs:
         body: "# CHANGELOG"
         draft: true
         files: |
-          deucalion/target/release/deucalion.dll
+          target/release/deucalion.dll
