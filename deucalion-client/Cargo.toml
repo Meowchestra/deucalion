@@ -22,5 +22,4 @@ sysinfo = "0.33.1"
 winapi = { version = "0.3", features = ["aclapi", "processthreadsapi"] }
 anyhow = "1.0"
 log = "0.4"
-simplelog = "0.12"
 clap = { version = "4.5", features = ["derive"] }

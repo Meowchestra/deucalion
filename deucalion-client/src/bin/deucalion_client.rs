@@ -2,8 +2,6 @@ use anyhow::{format_err, Result};
 
 use log::{error, info};
 
-use simplelog::{LevelFilter, SimpleLogger};
-
 use tokio::runtime::Runtime;
 
 use deucalion_client::{process, subscriber::BroadcastFilter, subscriber::Subscriber};
@@ -39,8 +37,6 @@ struct Args {
 }
 
 fn main() -> Result<()> {
-    SimpleLogger::init(LevelFilter::Debug, simplelog::Config::default())?;
-
     let args = Args::parse();
 
     let payload_path = std::path::Path::new(&args.payload);

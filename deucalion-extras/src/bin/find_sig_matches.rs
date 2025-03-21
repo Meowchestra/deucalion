@@ -6,11 +6,8 @@ use std::{env, time::Instant};
 use anyhow::{format_err, Context, Result};
 
 use log::info;
-use simplelog::{LevelFilter, SimpleLogger};
 
 fn main() {
-    SimpleLogger::init(LevelFilter::Debug, simplelog::Config::default()).unwrap();
-
     let args: Vec<String> = env::args().collect();
     if args.len() != 3 {
         panic!("2 positional args are required. See usage in the README.")

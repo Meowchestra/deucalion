@@ -1,7 +1,6 @@
 use std::io::{self, Read};
 use std::panic;
 
-use simplelog::{LevelFilter, SimpleLogger};
 use w32module::drop_ref_count_to_one;
 #[cfg(windows)]
 use winapi::shared::minwindef::*;
@@ -31,9 +30,6 @@ pub mod rpc;
 mod server;
 
 use log::{error, info};
-
-#[cfg(debug_assertions)]
-use simplelog::{CombinedLogger};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
 
@@ -174,28 +170,9 @@ fn pause() {
     let _ = io::stdin().read(&mut [0u8]).unwrap();
 }
 
-fn logging_setup() -> Result<()> {
-    #[cfg(debug_assertions)]
-    {
-        CombinedLogger::init(vec![
-            SimpleLogger::new(LevelFilter::Debug, simplelog::Config::default()),
-        ])?;
-    }
-    #[cfg(not(debug_assertions))]
-    {
-        SimpleLogger::init(LevelFilter::Info, simplelog::Config::default())?;
-    }
-
-    Ok(())
-}
-
 unsafe extern "system" fn main(dll_base_addr: LPVOID) -> u32 {
     #[cfg(debug_assertions)]
     consoleapi::AllocConsole();
-
-    if let Err(e) = logging_setup() {
-        println!("Error initializing logger: {e}");
-    }
 
     let result = panic::catch_unwind(|| {
         if let Err(e) = main_with_result() {
