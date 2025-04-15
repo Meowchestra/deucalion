@@ -1,30 +1,30 @@
-use std::collections::HashMap;
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
+use std::{
+    collections::HashMap,
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+};
 
-use anyhow::{format_err, Error, Result};
-
+use anyhow::{Error, Result, format_err};
 use futures::{SinkExt, Stream, StreamExt};
-
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::{mpsc, Mutex};
-use tokio::task::JoinSet;
-use tokio::time::{self, Duration};
+use log::{error, info};
+use once_cell::sync::OnceCell;
+use stream_cancel::Tripwire;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::{Mutex, mpsc},
+    task::JoinSet,
+    time::{self, Duration},
+};
 use tokio_util::codec::Framed;
 
-use once_cell::sync::OnceCell;
-
-use stream_cancel::Tripwire;
-
-use log::{error, info};
-
-use crate::namedpipe::Endpoint;
-use crate::rpc::{MessageOps, Payload, PayloadCodec};
+use crate::{
+    namedpipe::Endpoint,
+    rpc::{MessageOps, Payload, PayloadCodec},
+};
 
 /// Shorthand for the transmit half of the message channel.
 type Tx = mpsc::UnboundedSender<Payload>;
-
 /// Shorthand for the receive half of the message channel.
 type Rx = mpsc::UnboundedReceiver<Payload>;
 
@@ -32,7 +32,6 @@ type Rx = mpsc::UnboundedReceiver<Payload>;
 enum Message {
     /// A message that was sent from a subscriber to the server
     Request(Payload),
-
     /// A message that should be sent to subscribers
     Data(Payload),
 }
@@ -49,7 +48,6 @@ where
     /// we can work at the Payload level instead of having to manage the
     /// raw byte operations.
     frames: Framed<T, PayloadCodec>,
-
     /// Receive half of the message channel.
     ///
     /// This is used to receive messages from broadcasts.
@@ -79,10 +77,8 @@ where
         Poll::Ready(match result {
             // We've received a request
             Some(Ok(message)) => Some(Ok(Message::Request(message))),
-
             // An error occured.
             Some(Err(e)) => Some(Err(e.into())),
-
             // The stream has been exhausted.
             None => None,
         })
@@ -97,11 +93,7 @@ fn dbg_payload(ctx: u32, data: Vec<u8>) -> Payload {
 }
 
 fn ping_payload() -> Payload {
-    Payload {
-        op: MessageOps::Ping,
-        ctx: 0,
-        data: Vec::new(),
-    }
+    Payload { op: MessageOps::Ping, ctx: 0, data: vec![] }
 }
 
 /// Checks to make sure that the UTF-8 string is 30 characters or less and is
@@ -110,10 +102,7 @@ fn validate_nickname(nickname: &str) -> Result<()> {
     if nickname.len() > 30 {
         return Err(format_err!("Nickname exceeds 30 chars: {nickname:?}"));
     }
-    if !nickname
-        .chars()
-        .all(|c| c.is_ascii_alphanumeric() || c == '_')
-    {
+    if !nickname.chars().all(|c| c.is_ascii_alphanumeric() || c == '_') {
         return Err(format_err!(
             "Nickname contains invalid characters: {nickname:?}"
         ));
@@ -172,25 +161,16 @@ where
         F: Fn(Payload) -> Result<()>,
     {
         let ctx = payload.ctx;
-
-        let ack_prefix = {
-            match payload.op {
-                MessageOps::Recv => "RECV ",
-                MessageOps::Send => "SEND ",
-                _ => "",
-            }
+        let ack_prefix = match payload.op {
+            MessageOps::Recv => "RECV ",
+            MessageOps::Send => "SEND ",
+            _ => "",
         };
-
-        match payload_handler(payload) {
-            Ok(()) => {
-                self.send_dbg_payload(ctx, format!("{ack_prefix}OK").into())
-                    .await?
-            }
-            Err(e) => {
-                self.send_dbg_payload(ctx, format!("{ack_prefix}{e}").into())
-                    .await?
-            }
-        }
+        let debug_payload = match payload_handler(payload) {
+            Ok(()) => format!("{ack_prefix}OK"),
+            Err(e) => format!("{ack_prefix}{e}"),
+        };
+        self.send_dbg_payload(ctx, debug_payload.into()).await?;
         Ok(())
     }
 }
@@ -238,6 +218,7 @@ struct State {
     recv_hooked: bool,
     send_hooked: bool,
     send_lobby_hooked: bool,
+    create_target_hooked: bool,
 }
 
 impl State {
@@ -256,18 +237,18 @@ impl State {
         (id, rx)
     }
 
-    #[allow(clippy::needless_return)]
     fn hook_status_string(status: bool) -> &'static str {
-        return if status { "ON" } else { "OFF" };
+        if status { "ON" } else { "OFF" }
     }
 
     fn server_hello_string(&self) -> String {
         format!(
-            "SERVER HELLO. VERSION: {}. HOOK STATUS: RECV {}. SEND {}. SEND_LOBBY {}.",
+            "SERVER HELLO. VERSION: {}. HOOK STATUS: RECV {}. SEND {}. SEND_LOBBY {}. CREATE_TARGET {}.",
             crate::VERSION,
             Self::hook_status_string(self.recv_hooked),
             Self::hook_status_string(self.send_hooked),
             Self::hook_status_string(self.send_lobby_hooked),
+            Self::hook_status_string(self.create_target_hooked),
         )
     }
 }
@@ -287,17 +268,19 @@ impl Server {
                 recv_hooked: false,
                 send_hooked: false,
                 send_lobby_hooked: false,
+                create_target_hooked: false,
             })),
             shutdown_tx: OnceCell::new(),
         }
     }
 
     /// Notifies the server of the hook status.
-    pub async fn set_hook_status(&self, r: bool, s: bool, sl: bool) {
+    pub async fn set_hook_status(&self, r: bool, s: bool, sl: bool, ct: bool) {
         let mut state = self.state.lock().await;
         state.recv_hooked = r;
         state.send_hooked = s;
         state.send_lobby_hooked = sl;
+        state.create_target_hooked = ct;
     }
 
     pub async fn shutdown(&self) {
@@ -414,10 +397,7 @@ impl Server {
 
         info!("New subscriber connected: {nickname}");
 
-        match self
-            .subscriber_msg_loop(&mut subscriber, &mut nickname, payload_handler)
-            .await
-        {
+        match self.subscriber_msg_loop(&mut subscriber, &mut nickname, payload_handler).await {
             Ok(server_exit) => {
                 if server_exit {
                     return Ok(());
@@ -459,9 +439,7 @@ impl Server {
         let (trigger, tripwire) = Tripwire::new();
 
         let endpoint = Endpoint::new(pipe_name);
-
         let incoming = endpoint.incoming()?.take_until(tripwire);
-
         futures::pin_mut!(incoming);
 
         tokio::spawn(async move {
@@ -478,11 +456,7 @@ impl Server {
                 loop {
                     interval.tick().await;
                     self_clone
-                        .broadcast(Payload {
-                            op: MessageOps::Ping,
-                            ctx: 0,
-                            data: Vec::new(),
-                        })
+                        .broadcast(Payload { op: MessageOps::Ping, ctx: 0, data: vec![] })
                         .await;
                 }
             }
@@ -523,10 +497,11 @@ impl Server {
 mod tests {
     use std::sync::atomic::{AtomicU32, Ordering};
 
-    use super::*;
     use ntest::{assert_false, assert_true, timeout};
     use rand::Rng;
     use tokio::{select, task::JoinHandle};
+
+    use super::*;
 
     #[test]
     fn test_individual_packet_filters() {
@@ -592,28 +567,25 @@ mod tests {
     async fn test_server_hello_message() {
         let server = Server::new();
 
-        let fmt_msg = |a, b, c| {
+        let fmt_msg = |a, b, c, d| {
             format!(
-                "SERVER HELLO. VERSION: {}. HOOK STATUS: RECV {}. SEND {}. SEND_LOBBY {}.",
+                "SERVER HELLO. VERSION: {}. HOOK STATUS: RECV {a}. SEND {b}. SEND_LOBBY {c}. CREATE_TARGET {d}.",
                 crate::VERSION,
-                a,
-                b,
-                c
             )
         };
         let combinations = vec![
-            (false, false, false, fmt_msg("OFF", "OFF", "OFF")),
-            (false, false, true, fmt_msg("OFF", "OFF", "ON")),
-            (false, true, false, fmt_msg("OFF", "ON", "OFF")),
-            (false, true, true, fmt_msg("OFF", "ON", "ON")),
-            (true, false, false, fmt_msg("ON", "OFF", "OFF")),
-            (true, false, true, fmt_msg("ON", "OFF", "ON")),
-            (true, true, false, fmt_msg("ON", "ON", "OFF")),
-            (true, true, true, fmt_msg("ON", "ON", "ON")),
+            (false, false, true, true, fmt_msg("OFF", "OFF", "ON", "ON")),
+            (false, true, false, true, fmt_msg("OFF", "ON", "OFF", "ON")),
+            (false, true, true, true, fmt_msg("OFF", "ON", "ON", "ON")),
+            (true, false, false, true, fmt_msg("ON", "OFF", "OFF", "ON")),
+            (true, false, true, true, fmt_msg("ON", "OFF", "ON", "ON")),
+            (true, true, false, true, fmt_msg("ON", "ON", "OFF", "ON")),
+            (true, true, true, true, fmt_msg("ON", "ON", "ON", "ON")),
+            (true, true, true, false, fmt_msg("ON", "ON", "ON", "OFF")),
         ];
 
-        for (r, s, sl, expected_hello) in combinations {
-            server.set_hook_status(r, s, sl).await;
+        for (r, s, sl, ct, expected_hello) in combinations {
+            server.set_hook_status(r, s, sl, ct).await;
 
             assert_eq!(
                 server.state.lock().await.server_hello_string(),
@@ -650,11 +622,8 @@ mod tests {
     {
         // Handle the SERVER_HELLO message
         let message = frames.next().await.unwrap();
-        if let Ok(payload) = message {
-            assert_eq!(payload.ctx, HELLO_CHANNEL);
-        } else {
-            panic!("Did not properly receive Server Hello");
-        }
+        let payload = message.expect("Server Hello should be properly received");
+        assert_eq!(payload.ctx, HELLO_CHANNEL);
     }
 
     #[tokio::test(flavor = "multi_thread")]
@@ -678,24 +647,20 @@ mod tests {
 
             // Send option
             frames
-                .send(Payload {
-                    op: MessageOps::Option,
-                    ctx: filter,
-                    data: Vec::new(),
-                })
+                .send(Payload { op: MessageOps::Option, ctx: filter, data: vec![] })
                 .await
                 .unwrap();
 
             let message = frames.next().await.unwrap();
-            if let Ok(payload) = message {
-                assert_eq!(payload.op, MessageOps::Debug);
-                assert_eq!(
-                    String::from_utf8(payload.data).unwrap(),
-                    "Packet filters set: 0b00100110",
-                );
-            } else {
+            let Ok(payload) = message else {
                 panic!("Did not properly receive packet filter confirmation");
-            }
+            };
+
+            assert_eq!(payload.op, MessageOps::Debug);
+            assert_eq!(
+                String::from_utf8(payload.data).unwrap(),
+                "Packet filters set: 0b00100110",
+            );
 
             let configurations = vec![
                 (MessageOps::Recv, 0, false),
@@ -708,13 +673,7 @@ mod tests {
             ];
 
             for (op, ctx, should_be_allowed) in configurations {
-                server
-                    .broadcast(Payload {
-                        op,
-                        ctx,
-                        data: Vec::new(),
-                    })
-                    .await;
+                server.broadcast(Payload { op, ctx, data: vec![] }).await;
 
                 select! {
                     data = frames.next() => {
@@ -779,22 +738,19 @@ mod tests {
             handle_server_hello(&mut frames).await;
 
             for (nickname, expected_resp) in testcases {
-                frames
-                    .send(dbg_payload(HELLO_CHANNEL, nickname))
-                    .await
-                    .unwrap();
+                frames.send(dbg_payload(HELLO_CHANNEL, nickname)).await.unwrap();
 
                 let message = frames.next().await.unwrap();
-                if let Ok(payload) = message {
-                    assert_eq!(payload.op, MessageOps::Debug);
-                    assert_eq!(
-                        String::from_utf8(payload.data).unwrap(),
-                        expected_resp,
-                        "Expected response did not match"
-                    );
-                } else {
+                let Ok(payload) = message else {
                     panic!("Did not receive subscriber nickname confirmation");
-                }
+                };
+
+                assert_eq!(payload.op, MessageOps::Debug);
+                assert_eq!(
+                    String::from_utf8(payload.data).unwrap(),
+                    expected_resp,
+                    "Expected response did not match"
+                );
             }
         });
 
@@ -821,11 +777,7 @@ mod tests {
 
         // Send exit
         frames
-            .send(Payload {
-                op: MessageOps::Exit,
-                ctx: 0,
-                data: Vec::new(),
-            })
+            .send(Payload { op: MessageOps::Exit, ctx: 0, data: vec![] })
             .await
             .unwrap();
 
@@ -906,7 +858,6 @@ mod tests {
         for i in 0..2 {
             let mut dummy_data = Vec::from([0u8; 5000]);
             rand::rng().fill(&mut dummy_data[..]);
-
             server.broadcast(dbg_payload(i, dummy_data)).await;
         }
 
@@ -952,22 +903,20 @@ mod tests {
             for i in 0..NUM_PACKETS {
                 let mut dummy_data = Vec::from([0u8; 5000]);
                 rand::rng().fill(&mut dummy_data[..]);
-
                 server.broadcast(dbg_payload(i, dummy_data)).await;
             }
 
             // Test that every packet was received in order
             let mut num_received = 0u32;
             while let Some(result) = frames.next().await {
-                if let Ok(payload) = result {
-                    assert_eq!(
-                        payload.ctx, num_received,
-                        "Received data from pipe does not match expected index!"
-                    );
-                    num_received += 1;
-                    if num_received >= NUM_PACKETS {
-                        return;
-                    }
+                let Ok(payload) = result else { continue };
+                assert_eq!(
+                    payload.ctx, num_received,
+                    "Received data from pipe does not match expected index!"
+                );
+                num_received += 1;
+                if num_received >= NUM_PACKETS {
+                    return;
                 }
             }
         });
@@ -990,11 +939,12 @@ mod tests {
             let pipe_name_clone = pipe_name.clone();
             let sub_handle = tokio::spawn(async move {
                 // If the subscriber couldn't connect it's okay
-                if let Ok(subscriber) = Endpoint::connect(&pipe_name_clone).await {
-                    let codec = PayloadCodec::new();
-                    let mut frames = Framed::new(subscriber, codec);
-                    while frames.next().await.is_some() {}
-                }
+                let Ok(subscriber) = Endpoint::connect(&pipe_name_clone).await else {
+                    return;
+                };
+                let codec = PayloadCodec::new();
+                let mut frames = Framed::new(subscriber, codec);
+                while frames.next().await.is_some() {}
             });
             sub_handle.abort();
         }
@@ -1024,7 +974,7 @@ mod tests {
 
         // Send two packets
         for i in 0..2 {
-            server.broadcast(dbg_payload(i, Vec::new())).await;
+            server.broadcast(dbg_payload(i, vec![])).await;
         }
 
         // Give some time for the subscriber to process the messages

@@ -15,10 +15,9 @@ jobs:
           fetch-depth: 0
 
       - name: Install latest nightly
-        uses: dtolnay/rust-toolchain@master
+        uses: dtolnay/rust-toolchain@nightly
         with:
-          toolchain: nightly
-          components: clippy, rustfmt
+          components: rustfmt, clippy
 
       - name: Install cargo-edit
         run: cargo install cargo-edit

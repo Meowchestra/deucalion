@@ -15,55 +15,59 @@ jobs:
     - uses: actions/checkout@v4
 
     - name: Install latest nightly
-      uses: dtolnay/rust-toolchain@master
+      uses: dtolnay/rust-toolchain@nightly
       with:
-        toolchain: nightly
-        components: clippy, rustfmt
+        components: rustfmt, clippy
 
-    # - name: Import GPG key
-      # id: import_gpg
-      # uses: crazy-max/ghaction-import-gpg@v5
-      # with:
-        # gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
-        # passphrase: ${{ secrets.GPG_PASSPHRASE }}
+    #- name: Import GPG key
+    #  id: import_gpg
+    #  uses: crazy-max/ghaction-import-gpg@v6
+    #  with:
+    #    gpg_private_key: ${{ secrets.GPG_PRIVATE_KEY }}
+    #    passphrase: ${{ secrets.GPG_PASSPHRASE }}
 
-    # - name: List Keys
-      # run: gpg -K
+    #- name: List Keys
+    #  run: gpg -K
 
+    # For some reason, building deucalion inside its own directory yields
+    # a smaller binary
     - name: Build
-      run: cargo build --release
+      run: |
+        cargo build --release
+        cd deucalion
+        cargo build --release
 
-    # - name: Build bcryptprimitives.rs shim
-      # run: rustc shims/bcryptprimitives.rs -Copt-level=3 -Clto=fat --out-dir target/release
+    #- name: Build bcryptprimitives.rs shim
+    #  run: rustc shims/bcryptprimitives.rs -Copt-level=3 -Clto=fat --out-dir target/release
 
-    # - name: Code Sign
-      # uses: dlemstra/code-sign-action@v1
-      # with:
-        # certificate: '${{ secrets.CODE_SIGN_CERTIFICATE }}'
-        # password: '${{ secrets.CODE_SIGN_PASSWORD }}'
-        # recursive: false
-        # files: |
-          # target/release/deucalion.dll
-          # target/release/deucalion_client.exe
-          # target/release/bcryptprimitives.dll
+    #- name: Code Sign
+    #  uses: dlemstra/code-sign-action@v1
+    #  with:
+    #    certificate: '${{ secrets.CODE_SIGN_CERTIFICATE }}'
+    #    password: '${{ secrets.CODE_SIGN_PASSWORD }}'
+    #    recursive: false
+    #    files: |
+    #      target/release/deucalion.dll
+    #      target/release/deucalion_client.exe
+    #      target/release/bcryptprimitives.dll
 
-    # - name: Deucalion SHA256Sum and GPG Sign
-      # run: |
-        # sha256sum target/release/deucalion.dll > deucalion.sha256sum
-        # gpg --output deucalion.sha256sum.asc --clearsign deucalion.sha256sum
-        # cat deucalion.sha256sum.asc
+    #- name: Deucalion SHA256Sum and GPG Sign
+    #  run: |
+    #    sha256sum target/release/deucalion.dll > deucalion.sha256sum
+    #    gpg --output deucalion.sha256sum.asc --clearsign deucalion.sha256sum
+    #    cat deucalion.sha256sum.asc
 
-    # - name: Deucalion Client SHA256Sum and GPG Sign
-      # run: |
-        # sha256sum target/release/deucalion_client.exe > deucalion_client.sha256sum
-        # gpg --output deucalion_client.sha256sum.asc --clearsign deucalion_client.sha256sum
-        # cat deucalion_client.sha256sum.asc
+    #- name: Deucalion Client SHA256Sum and GPG Sign
+    #  run: |
+    #    sha256sum target/release/deucalion_client.exe > deucalion_client.sha256sum
+    #    gpg --output deucalion_client.sha256sum.asc --clearsign deucalion_client.sha256sum
+    #    cat deucalion_client.sha256sum.asc
 
-    # - name: Bcryptprimitives SHA256Sum and GPG Sign
-      # run: |
-        # sha256sum target/release/bcryptprimitives.dll > bcryptprimitives.sha256sum
-        # gpg --output bcryptprimitives.sha256sum.asc --clearsign bcryptprimitives.sha256sum
-        # cat bcryptprimitives.sha256sum.asc
+    #- name: Bcryptprimitives SHA256Sum and GPG Sign
+    #  run: |
+    #    sha256sum target/release/bcryptprimitives.dll > bcryptprimitives.sha256sum
+    #    gpg --output bcryptprimitives.sha256sum.asc --clearsign bcryptprimitives.sha256sum
+    #    cat bcryptprimitives.sha256sum.asc
 
     - name: Upload artifact
       uses: actions/upload-artifact@v4

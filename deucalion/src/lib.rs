@@ -1,24 +1,18 @@
-use std::io::{self, Read};
-use std::panic;
+#![feature(link_llvm_intrinsics)]
+#![allow(internal_features)]
+#![deny(unused_imports)]
 
+use std::{io::Read, sync::Arc};
+
+use anyhow::{Context, Result, format_err};
 use w32module::drop_ref_count_to_one;
+#[cfg(debug_assertions)]
+use winapi::um::{consoleapi, wincon};
 #[cfg(windows)]
-use winapi::shared::minwindef::*;
-use winapi::um::libloaderapi;
-use winapi::um::minwinbase::*;
-use winapi::um::processthreadsapi;
-
-#[cfg(debug_assertions)]
-use winapi::um::consoleapi;
-#[cfg(debug_assertions)]
-use winapi::um::wincon;
-
-use std::sync::Arc;
-
-use anyhow::{format_err, Context, Result};
-
-use tokio::select;
-use tokio::sync::oneshot;
+use winapi::{
+    shared::minwindef::*,
+    um::{libloaderapi, minwinbase::*, processthreadsapi},
+};
 
 mod hook;
 mod w32module;
@@ -32,71 +26,60 @@ mod server;
 use log::{error, info};
 
 const VERSION: &str = env!("CARGO_PKG_VERSION");
+const COMMIT_SHA: &str = env!("VERGEN_GIT_SHA");
+const COMMIT_DIRTY: &str = env!("VERGEN_GIT_DIRTY");
 
 const RECV_SIG: &str = "E8 $ { ' } 4C 8B 4F 10 8B 47 1C 45";
 const SEND_SIG: &str = "40 57 41 56 48 83 EC 38 48 8B F9 4C 8B F2";
 const SEND_LOBBY_SIG: &str = "40 53 48 83 EC 20 44 8B 41 28";
+/// Overriding with a custom signature for create_target is not supported. If
+/// this has changed, it is likely that the hook is broken in a way that just
+/// a signature change won't fix.
+const CREATE_TARGET_SIG: &str = "E8 $ { ' } 41 83 C7 ? 41 81 FF";
 
 fn handle_payload(payload: rpc::Payload, hs: Arc<hook::State>) -> Result<()> {
-    if payload.op == rpc::MessageOps::Recv || payload.op == rpc::MessageOps::Send {
-        let hook_type = match payload.op {
-            rpc::MessageOps::Recv => hook::HookType::Recv,
-            rpc::MessageOps::Send => {
-                if payload.ctx == 0 {
-                    hook::HookType::SendLobby
-                } else {
-                    hook::HookType::Send
-                }
-            }
-            _ => panic!("This case shouldn't be possible"),
-        };
-        if let Err(e) = parse_sig_and_initialize_hook(hs, payload.data, hook_type) {
-            let err = format_err!("error initializing hook: {e}");
-            error!("{err}");
-            return Err(err);
-        }
-    }
-    Ok(())
+    let hook_type = match payload.op {
+        rpc::MessageOps::Recv => hook::HookType::Recv,
+        rpc::MessageOps::Send if payload.ctx == 0 => hook::HookType::SendLobby,
+        rpc::MessageOps::Send => hook::HookType::Send,
+        _ => return Ok(()),
+    };
+
+    let sig_str = String::from_utf8(payload.data).context("Invalid string")?;
+    hs.initialize_hook(sig_str, hook_type).map_err(|e| {
+        // Errors will be returned to the sender, so we should do the logging here.
+        error!("Hook initialization error: {e}");
+        format_err!("error initializing hook: {e}")
+    })
 }
 
-fn parse_sig_and_initialize_hook(
-    hs: Arc<hook::State>,
-    data: Vec<u8>,
-    hook_type: hook::HookType,
-) -> Result<()> {
-    let sig_str = String::from_utf8(data).context("Invalid string")?;
-    hs.initialize_hook(sig_str, hook_type)
-}
-
+#[rustfmt::skip]
 fn initialize_hook_with_sig(hs: &Arc<hook::State>, sig: &str, hook_type: hook::HookType) -> bool {
-    if let Err(e) = hs.initialize_hook(sig.into(), hook_type) {
+    hs.initialize_hook(sig.into(), hook_type).map_err(|e| {
         error!("Could not auto-initialize the {hook_type} hook: {e}");
-        false
-    } else {
-        true
-    }
+    }).is_ok()
 }
+
 /// Automatically initialize all the hooks, but do not fatally exit if any
 /// fail to initialize.
 /// Returns initialization status for Recv, Send, SendLobby hook types
-fn auto_initialize_hooks(hs: &Arc<hook::State>) -> (bool, bool, bool) {
+fn auto_initialize_hooks(hs: &Arc<hook::State>) -> (bool, bool, bool, bool) {
     let r = initialize_hook_with_sig(hs, RECV_SIG, hook::HookType::Recv);
     let s = initialize_hook_with_sig(hs, SEND_SIG, hook::HookType::Send);
     let sl = initialize_hook_with_sig(hs, SEND_LOBBY_SIG, hook::HookType::SendLobby);
-    (r, s, sl)
+    let ct = initialize_hook_with_sig(hs, CREATE_TARGET_SIG, hook::HookType::CreateTarget);
+    (r, s, sl, ct)
 }
 
 #[tokio::main]
 async fn main_with_result() -> Result<()> {
-    info!("Starting Deucalion v{VERSION}");
+    let dirty = if COMMIT_DIRTY == "true" { "(dirty)" } else { "" };
+    info!("Starting Deucalion v{VERSION}-{COMMIT_SHA}{dirty}",);
     let hs = Arc::new(hook::State::new().context("error setting up the hook")?);
     let deucalion_server = server::Server::new();
-
     info!("Attempting to auto-initialize the hooks");
-
-    let (r, s, sl) = auto_initialize_hooks(&hs);
-
-    deucalion_server.set_hook_status(r, s, sl).await;
+    let (r, s, sl, ct) = auto_initialize_hooks(&hs);
+    deucalion_server.set_hook_status(r, s, sl, ct).await;
     info!("Hooks initialized.");
 
     // Clone references to hook state and server state so that they can
@@ -104,17 +87,15 @@ async fn main_with_result() -> Result<()> {
     let hs_clone = hs.clone();
     let deucalion_server_clone = deucalion_server.clone();
 
-    let (shutdown_tx, mut shutdown_rx) = oneshot::channel::<()>();
+    let (shutdown_tx, mut shutdown_rx) = tokio::sync::oneshot::channel::<()>();
 
     // Message loop that forwards messages from the hooks to the server task
     let msg_loop_handle = tokio::spawn(async move {
+        let mut broadcast_rx = hs_clone.broadcast_rx.lock().await;
         loop {
-            let mut broadcast_rx = hs_clone.broadcast_rx.lock().await;
-            select! {
-                res = broadcast_rx.recv() => {
-                    if let Some(payload) = res {
-                        deucalion_server_clone.broadcast(payload).await;
-                    }
+            tokio::select! {
+                Some(payload) = broadcast_rx.recv() => {
+                    deucalion_server_clone.broadcast(payload).await;
                 },
                 _ = &mut shutdown_rx => {
                     hs_clone.shutdown();
@@ -150,31 +131,35 @@ async fn main_with_result() -> Result<()> {
 const DLL_PROCESS_ATTACH: u32 = 1;
 
 #[allow(non_snake_case)]
-#[no_mangle]
+#[unsafe(no_mangle)]
 unsafe extern "system" fn DllMain(hModule: HINSTANCE, reason: u32, _: u32) -> BOOL {
     if reason == DLL_PROCESS_ATTACH {
-        processthreadsapi::CreateThread(
-            0 as LPSECURITY_ATTRIBUTES,
-            0,
-            Some(main),
-            hModule as LPVOID,
-            0,
-            0 as LPDWORD,
-        );
+        unsafe {
+            processthreadsapi::CreateThread(
+                0 as LPSECURITY_ATTRIBUTES,
+                0,
+                Some(main),
+                hModule as LPVOID,
+                0,
+                0 as LPDWORD,
+            );
+        }
     }
     TRUE
 }
 
 fn pause() {
     println!("Press enter to exit...");
-    let _ = io::stdin().read(&mut [0u8]).unwrap();
+    let _ = std::io::stdin().read(&mut [0u8]).unwrap();
 }
 
 unsafe extern "system" fn main(dll_base_addr: LPVOID) -> u32 {
-    #[cfg(debug_assertions)]
-    consoleapi::AllocConsole();
+    unsafe {
+        #[cfg(debug_assertions)]
+        consoleapi::AllocConsole();
+    }
 
-    let result = panic::catch_unwind(|| {
+    let result = std::panic::catch_unwind(|| {
         if let Err(e) = main_with_result() {
             error!("Encountered fatal error: {e}");
             pause();
@@ -184,13 +169,15 @@ unsafe extern "system" fn main(dll_base_addr: LPVOID) -> u32 {
         error!("Panic happened: {cause:?}");
         pause();
     }
-    if let Err(e) = drop_ref_count_to_one(dll_base_addr as HMODULE) {
+    if let Err(e) = unsafe { drop_ref_count_to_one(dll_base_addr as HMODULE) } {
         error!("Could not drop ref count to one: {e}")
     }
     info!("Shut down!");
-    #[cfg(debug_assertions)]
-    wincon::FreeConsole();
-    libloaderapi::FreeLibraryAndExitThread(dll_base_addr as HMODULE, 0);
+    unsafe {
+        #[cfg(debug_assertions)]
+        wincon::FreeConsole();
+        libloaderapi::FreeLibraryAndExitThread(dll_base_addr as HMODULE, 0);
+    }
     // Exit should happen before here
     0
 }

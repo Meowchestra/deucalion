@@ -11,9 +11,7 @@ impl WaitGroup {
     /// The semaphore will limit the number of processes that can access
     /// the underlying resource at every point in time to the specified capacity.
     pub fn new() -> Self {
-        WaitGroup {
-            raw: Arc::new(RawWaitGroup::new()),
-        }
+        WaitGroup { raw: Arc::new(RawWaitGroup::new()) }
     }
 
     #[inline]
@@ -52,8 +50,9 @@ impl Drop for WaitGroupGuard {
     }
 }
 
-use parking_lot::{Condvar, Mutex};
 use std::sync::atomic::{AtomicUsize, Ordering};
+
+use parking_lot::{Condvar, Mutex};
 
 struct RawWaitGroup {
     active: AtomicUsize,
@@ -74,15 +73,16 @@ impl RawWaitGroup {
     pub fn add(&self) {
         loop {
             let current_active = self.active.load(Ordering::SeqCst);
-            if let Ok(previous_active) = self.active.compare_exchange(
+            let Ok(previous_active) = self.active.compare_exchange(
                 current_active,
                 current_active + 1,
                 Ordering::SeqCst,
                 Ordering::SeqCst,
-            ) {
-                if previous_active == current_active {
-                    return;
-                }
+            ) else {
+                continue;
+            };
+            if previous_active == current_active {
+                return;
             }
         }
     }

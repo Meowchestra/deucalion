@@ -29,17 +29,20 @@ IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
 DEALINGS IN THE SOFTWARE.
 */
 
-use winapi::shared::winerror::ERROR_PIPE_BUSY;
+use std::{
+    io,
+    path::Path,
+    pin::Pin,
+    task::{Context, Poll},
+    time::{Duration, Instant},
+};
 
 use futures::Stream;
-use std::io;
-use std::path::Path;
-use std::pin::Pin;
-use std::task::{Context, Poll};
-use std::time::{Duration, Instant};
-use tokio::io::{AsyncRead, AsyncWrite};
-
-use tokio::net::windows::named_pipe;
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    net::windows::named_pipe,
+};
+use winapi::shared::winerror::ERROR_PIPE_BUSY;
 
 enum NamedPipe {
     Server(named_pipe::NamedPipeServer),
@@ -98,11 +101,7 @@ impl Endpoint {
         // so we keep trying or sleeping for a bit, until we hit a timeout
         let attempt_start = Instant::now();
         let client = loop {
-            match named_pipe::ClientOptions::new()
-                .read(true)
-                .write(true)
-                .open(path)
-            {
+            match named_pipe::ClientOptions::new().read(true).write(true).open(path) {
                 Ok(client) => break client,
                 Err(e) if e.raw_os_error() == Some(ERROR_PIPE_BUSY as i32) => {
                     if attempt_start.elapsed() < PIPE_AVAILABILITY_TIMEOUT {
@@ -121,10 +120,7 @@ impl Endpoint {
 
     /// New IPC endpoint at the given path
     pub fn new(path: String) -> Self {
-        Endpoint {
-            path,
-            created_listener: false,
-        }
+        Endpoint { path, created_listener: false }
     }
 }
 

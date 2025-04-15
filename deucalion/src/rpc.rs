@@ -1,5 +1,6 @@
-use bytes::{Buf, BufMut, Bytes, BytesMut};
 use std::io;
+
+use bytes::{Buf, BufMut, Bytes, BytesMut};
 use tokio_util::codec::{Decoder, Encoder, LengthDelimitedCodec};
 
 #[repr(u8)]
@@ -41,11 +42,7 @@ pub struct Payload {
 impl From<Bytes> for Payload {
     fn from(data: Bytes) -> Self {
         let mut b = data;
-        Self {
-            op: b.get_u8().into(),
-            ctx: b.get_u32_le(),
-            data: b.to_vec(),
-        }
+        Self { op: b.get_u8().into(), ctx: b.get_u32_le(), data: b.to_vec() }
     }
 }
 
@@ -107,51 +104,15 @@ mod tests {
 
     fn expected_payloads() -> Vec<Payload> {
         vec![
-            Payload {
-                op: MessageOps::Debug,
-                ctx: 100,
-                data: vec![1, 2, 3],
-            },
-            Payload {
-                op: MessageOps::Ping,
-                ctx: 100,
-                data: vec![1, 2, 3],
-            },
-            Payload {
-                op: MessageOps::Exit,
-                ctx: 100,
-                data: vec![1, 2, 3],
-            },
-            Payload {
-                op: MessageOps::Recv,
-                ctx: 100,
-                data: vec![1, 2, 3],
-            },
-            Payload {
-                op: MessageOps::Send,
-                ctx: 100,
-                data: vec![1, 2, 3],
-            },
-            Payload {
-                op: MessageOps::Option,
-                ctx: 100,
-                data: vec![1, 2, 3],
-            },
-            Payload {
-                op: MessageOps::RecvOther,
-                ctx: 100,
-                data: vec![1, 2, 3],
-            },
-            Payload {
-                op: MessageOps::SendOther,
-                ctx: 100,
-                data: vec![1, 2, 3],
-            },
-            Payload {
-                op: MessageOps::Debug,
-                ctx: 100,
-                data: vec![1, 2, 3],
-            },
+            Payload { op: MessageOps::Debug, ctx: 100, data: vec![1, 2, 3] },
+            Payload { op: MessageOps::Ping, ctx: 100, data: vec![1, 2, 3] },
+            Payload { op: MessageOps::Exit, ctx: 100, data: vec![1, 2, 3] },
+            Payload { op: MessageOps::Recv, ctx: 100, data: vec![1, 2, 3] },
+            Payload { op: MessageOps::Send, ctx: 100, data: vec![1, 2, 3] },
+            Payload { op: MessageOps::Option, ctx: 100, data: vec![1, 2, 3] },
+            Payload { op: MessageOps::RecvOther, ctx: 100, data: vec![1, 2, 3] },
+            Payload { op: MessageOps::SendOther, ctx: 100, data: vec![1, 2, 3] },
+            Payload { op: MessageOps::Debug, ctx: 100, data: vec![1, 2, 3] },
         ]
     }
 
@@ -184,7 +145,7 @@ mod tests {
         ];
         let mut buf = BytesMut::from(data);
         let mut codec = PayloadCodec::new();
-        let mut payloads: Vec<Payload> = Vec::new();
+        let mut payloads = Vec::<Payload>::new();
 
         while let Some(payload) = codec.decode(&mut buf).unwrap() {
             payloads.push(payload);
@@ -201,7 +162,7 @@ mod tests {
         ];
         let mut buf = BytesMut::from(data);
         let mut codec = PayloadCodec::new();
-        let mut payloads: Vec<Payload> = Vec::new();
+        let mut payloads = Vec::<Payload>::new();
 
         while let Some(payload) = codec.decode(&mut buf).unwrap() {
             payloads.push(payload);
@@ -212,12 +173,12 @@ mod tests {
                 Payload {
                     op: MessageOps::Debug,
                     ctx: 100,
-                    data: vec![4, 5, 6, 7, 8, 9],
+                    data: vec![4, 5, 6, 7, 8, 9]
                 },
                 Payload {
                     op: MessageOps::Ping,
                     ctx: 101,
-                    data: vec![4, 5, 6, 7, 8, 9, 10],
+                    data: vec![4, 5, 6, 7, 8, 9, 10]
                 },
             ]
         );

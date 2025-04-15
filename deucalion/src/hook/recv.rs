@@ -1,20 +1,18 @@
-use std::mem;
+use std::{
+    mem,
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+};
 
 use anyhow::Result;
-
+use log::{error, warn};
+use retour::{StaticDetour, static_detour};
 use tokio::sync::mpsc;
 
-use retour::{static_detour, StaticDetour};
-
-use crate::rpc;
-
-use crate::procloader::get_ffxiv_handle;
-
-use super::packet;
-use super::waitgroup;
-use super::{Channel, HookError};
-
-use log::error;
+use super::{Channel, HookError, packet, waitgroup};
+use crate::{procloader::get_ffxiv_handle, rpc};
 
 type HookedFunction = unsafe extern "system" fn(*const u8, *const u8, usize, usize, usize) -> usize;
 type StaticHook = StaticDetour<HookedFunction>;
@@ -28,22 +26,37 @@ static_detour! {
 #[derive(Clone)]
 pub struct Hook {
     data_tx: mpsc::UnboundedSender<rpc::Payload>,
+    deobf_queue_tx: crossbeam_channel::Sender<packet::Packet>,
+    deobf_queue_rx: crossbeam_channel::Receiver<packet::Packet>,
+    create_target_hook_enabled: Arc<AtomicBool>,
     wg: waitgroup::WaitGroup,
 }
 
 impl Hook {
     pub fn new(
         data_tx: mpsc::UnboundedSender<rpc::Payload>,
+        deobf_queue_tx: crossbeam_channel::Sender<packet::Packet>,
+        deobf_queue_rx: crossbeam_channel::Receiver<packet::Packet>,
         wg: waitgroup::WaitGroup,
     ) -> Result<Hook> {
-        Ok(Hook { data_tx, wg })
+        Ok(Hook {
+            data_tx,
+            deobf_queue_tx,
+            deobf_queue_rx,
+            create_target_hook_enabled: Arc::new(AtomicBool::new(false)),
+            wg,
+        })
+    }
+
+    pub fn set_create_target_hook_enabled(&self, enabled: bool) {
+        self.create_target_hook_enabled.store(enabled, Ordering::SeqCst);
     }
 
     pub fn setup(&self, rvas: Vec<usize>) -> Result<()> {
         if rvas.len() != 3 {
             return Err(HookError::SignatureMatchFailed(rvas.len(), 3).into());
         }
-        let mut ptrs: Vec<*const u8> = Vec::new();
+        let mut ptrs = Vec::<*const u8>::new();
         for rva in rvas {
             ptrs.push(get_ffxiv_handle()?.wrapping_add(rva));
         }
@@ -63,10 +76,12 @@ impl Hook {
 
     unsafe fn setup_hook(&self, hook: &StaticHook, channel: Channel, rva: *const u8) -> Result<()> {
         let self_clone = self.clone();
-        let ptr_fn: HookedFunction = mem::transmute(rva as *const ());
-        hook.initialize(ptr_fn, move |a, b, c, d, e| {
-            self_clone.recv_packet(channel, a, b, c, d, e)
-        })?;
+        let ptr_fn: HookedFunction = unsafe { mem::transmute(rva as *const ()) };
+        unsafe {
+            hook.initialize(ptr_fn, move |a, b, c, d, e| {
+                self_clone.recv_packet(channel, a, b, c, d, e)
+            })?;
+        }
         Ok(())
     }
 
@@ -86,34 +101,53 @@ impl Hook {
             Channel::Lobby => &DecompressPacketLobby,
             Channel::Zone => &DecompressPacketZone,
         };
-        let ret = hook.call(a1, a2, a3, a4, a5);
+        let ret = unsafe { hook.call(a1, a2, a3, a4, a5) };
 
-        let ptr_frame: *const u8 = *(a1.add(16) as *const usize) as *const u8;
-        let offset: u32 = *(a1.add(28) as *const u32);
+        let ptr_frame = unsafe { *(a1.add(16) as *const usize) as *mut u8 };
+        let offset: u32 = unsafe { *(a1.add(28) as *const u32) };
         if offset != 0 {
             return ret;
         }
 
-        match packet::extract_packets_from_frame(ptr_frame) {
-            Ok(packets) => {
-                for packet in packets {
-                    let payload = match packet {
-                        packet::Packet::Ipc(data) => rpc::Payload {
-                            op: rpc::MessageOps::Recv,
-                            ctx: channel as u32,
-                            data,
-                        },
-                        packet::Packet::Other(data) => rpc::Payload {
-                            op: rpc::MessageOps::RecvOther,
-                            ctx: channel as u32,
-                            data,
-                        },
-                    };
-                    let _ = self.data_tx.send(payload);
-                }
-            }
+        let require_deobf = if let Channel::Zone = channel {
+            self.create_target_hook_enabled.load(Ordering::SeqCst)
+        } else {
+            false
+        };
+
+        if require_deobf && !self.deobf_queue_rx.is_empty() {
+            warn!("Packet queue has not been fully read. The queue will be emptied.");
+            let _: Vec<_> = self.deobf_queue_rx.try_iter().collect();
+        }
+
+        let packets = match unsafe { packet::extract_packets_from_frame(ptr_frame, require_deobf) }
+        {
+            Ok(packets) => packets,
             Err(e) => {
-                error!("Could not process packet: {e}")
+                error!("Could not process packet: {e}");
+                return ret;
+            }
+        };
+
+        for packet in packets {
+            match packet {
+                packet::Packet::Ipc(data) => {
+                    let _ = self.data_tx.send(rpc::Payload {
+                        op: rpc::MessageOps::Recv,
+                        ctx: channel as u32,
+                        data,
+                    });
+                }
+                packet::Packet::ObfuscatedIpc { .. } => {
+                    let _ = self.deobf_queue_tx.send(packet);
+                }
+                packet::Packet::Other(data) => {
+                    let _ = self.data_tx.send(rpc::Payload {
+                        op: rpc::MessageOps::RecvOther,
+                        ctx: channel as u32,
+                        data,
+                    });
+                }
             }
         }
 

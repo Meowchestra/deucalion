@@ -1,7 +1,7 @@
 
 [package]
 name = "deucalion-client"
-version = "1.1.2"
+version = "1.2.1"
 authors = ["ff14wed"]
 edition = "2021"
 license = "GPL-3.0"
@@ -12,13 +12,13 @@ readme = "README.md"
 keywords = ["ffxiv", "windows", "dll-injection", "dll"]
 
 [dependencies]
+dll-syringe = { git = "https://github.com/fry/dll-syringe", rev = "0a8b18e" }
 deucalion = { path = "../deucalion" }
 tokio = { version = "1.44.1", features = ["io-util", "sync", "rt"] }
 tokio-util = { version = "0.7.14", features = ["codec", "compat"] }
 tokio-retry = "0.3"
 futures = "0.3"
-dll-syringe = { git = "https://github.com/fry/dll-syringe", rev = "0a8b18e" }
-sysinfo = "0.33.1"
+sysinfo = "0.34"
 winapi = { version = "0.3", features = ["aclapi", "processthreadsapi"] }
 anyhow = "1.0"
 log = "0.4"

@@ -1,22 +1,20 @@
-use std::{mem, ptr};
-
-use winapi::shared::minwindef;
-use winapi::shared::minwindef::MAX_PATH;
-use winapi::um::libloaderapi;
-
-use std::ffi::OsString;
-use std::os::windows::prelude::OsStringExt;
+use std::{ffi::OsString, mem, os::windows::prelude::OsStringExt, ptr};
 
 use anyhow::{Context, Result};
-use thiserror::Error;
-
-use pelite::pattern as pat;
-use pelite::pe::image::{Rva, Va};
-use pelite::pe::Pe;
-
-use memchr::memmem;
-
 use log::{debug, info};
+use memchr::memmem;
+use pelite::{
+    pattern as pat,
+    pe::{
+        Pe,
+        image::{Rva, Va},
+    },
+};
+use thiserror::Error;
+use winapi::{
+    shared::{minwindef, minwindef::MAX_PATH},
+    um::libloaderapi,
+};
 
 #[derive(Debug, Error)]
 enum ProcLoaderError {
@@ -123,8 +121,9 @@ pub fn find_pattern_matches<'a, P: Pe<'a>>(
     name: &'static str,
     pat: &[pat::Atom],
     pe: P,
+    find_deepest_match: bool,
 ) -> Result<Vec<usize>> {
-    let mut addrs: Vec<usize> = Vec::new();
+    let mut addrs = Vec::<usize>::new();
 
     let mut start_rva: usize = 0;
 
@@ -140,20 +139,20 @@ pub fn find_pattern_matches<'a, P: Pe<'a>>(
             break;
         }
 
-        let mut deepest_match = 0;
-        for m in save {
-            if m > 0 {
-                deepest_match = m
+        let mut found_rva = save[0];
+        if find_deepest_match {
+            for m in save {
+                if m > 0 {
+                    found_rva = m;
+                }
             }
         }
 
-        if deepest_match == 0 {
+        if found_rva == 0 {
             return Err(SigScanError::InvalidMatch { name }.into());
         }
 
-        let rva: usize = deepest_match as usize;
-        addrs.push(rva);
-
+        addrs.push(found_rva as usize);
         start_rva = save[0] as usize + 1;
     }
 
@@ -169,7 +168,7 @@ pub fn find_pattern_matches<'a, P: Pe<'a>>(
 /// subset of the pattern syntax is supported.
 fn get_pat_len_and_excerpt(pat: &[pat::Atom]) -> Result<(usize, Vec<u8>, usize)> {
     let mut idx = 0;
-    let mut excerpt: Vec<u8> = Vec::new();
+    let mut excerpt = Vec::<u8>::new();
 
     let mut pat_len: usize = 0;
     let mut offset: usize = 0;

@@ -1,11 +1,9 @@
-use deucalion::procloader;
-use pelite::pe64::PeView;
-use pelite::{pattern, ImageMap};
 use std::{env, time::Instant};
 
-use anyhow::{format_err, Context, Result};
-
+use anyhow::{Context, Result, format_err};
+use deucalion::procloader;
 use log::info;
+use pelite::{ImageMap, pattern, pe64::PeView};
 
 fn main() {
     let args: Vec<String> = env::args().collect();
@@ -34,7 +32,7 @@ fn scan_sigs(image: &[u8], sig_str: &str) -> Result<Vec<usize>> {
     let pat = pattern::parse(sig_str).context(format!("Invalid signature: \"{sig_str}\""))?;
     let sig: &[pattern::Atom] = &pat;
 
-    let rvas = procloader::find_pattern_matches("", sig, file)
+    let rvas = procloader::find_pattern_matches("", sig, file, true)
         .map_err(|e| format_err!("{}: {}", e, sig_str))?;
 
     info!("Pattern search took {:?}", start.elapsed());

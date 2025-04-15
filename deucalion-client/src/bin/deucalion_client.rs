@@ -1,12 +1,11 @@
-use anyhow::{format_err, Result};
-
-use log::{error, info};
-
-use tokio::runtime::Runtime;
-
-use deucalion_client::{process, subscriber::BroadcastFilter, subscriber::Subscriber};
-
+use anyhow::{Result, format_err};
 use clap::Parser;
+use deucalion_client::{
+    process,
+    subscriber::{BroadcastFilter, Subscriber},
+};
+use log::{error, info};
+use tokio::runtime::Runtime;
 
 #[derive(Parser, Debug)]
 #[command(about, long_about = None)]

@@ -1,23 +1,23 @@
-use std::pin::Pin;
-use std::sync::Arc;
-use std::task::{Context, Poll};
-use std::time::Duration;
+use std::{
+    pin::Pin,
+    sync::Arc,
+    task::{Context, Poll},
+    time::Duration,
+};
 
-use anyhow::{format_err, Result};
-
+use anyhow::{Result, format_err};
+use deucalion::{
+    namedpipe::Endpoint,
+    rpc::{MessageOps, Payload, PayloadCodec},
+};
 use futures::{SinkExt, Stream, StreamExt};
-
-use tokio::io::{AsyncRead, AsyncWrite};
-use tokio::sync::mpsc;
-use tokio::sync::OnceCell;
-use tokio_util::codec::Framed;
-
 use log::{error, info};
-
-use tokio_retry::{strategy::ExponentialBackoff, Retry};
-
-use deucalion::namedpipe::Endpoint;
-use deucalion::rpc::{MessageOps, Payload, PayloadCodec};
+use tokio::{
+    io::{AsyncRead, AsyncWrite},
+    sync::{OnceCell, mpsc},
+};
+use tokio_retry::{Retry, strategy::ExponentialBackoff};
+use tokio_util::codec::Framed;
 
 /// Shorthand for the receive half of the message channel.
 type Rx = mpsc::UnboundedReceiver<Payload>;
@@ -113,9 +113,7 @@ impl Default for Subscriber {
 
 impl Subscriber {
     pub fn new() -> Self {
-        Self {
-            shutdown_tx: Arc::new(OnceCell::new()),
-        }
+        Self { shutdown_tx: Arc::new(OnceCell::new()) }
     }
 
     pub async fn shutdown(&self) {
@@ -191,9 +189,7 @@ impl Subscriber {
             .map_err(|_| format_err!("cannot run subscriber more than once"))?;
 
         let subscriber = Retry::spawn(
-            ExponentialBackoff::from_millis(10)
-                .max_delay(Duration::from_secs(1))
-                .take(8),
+            ExponentialBackoff::from_millis(10).max_delay(Duration::from_secs(1)).take(8),
             || Endpoint::connect(pipe_name),
         )
         .await?;
@@ -203,13 +199,14 @@ impl Subscriber {
         let mut frames = Framed::new(subscriber, codec);
 
         // Handle the SERVER_HELLO message
-        let hello_message = frames
-            .next()
-            .await
-            .ok_or(format_err!("Couldn't get next frame"))??;
+        let hello_message = frames.next().await.ok_or(format_err!("Couldn't get next frame"))??;
         if hello_message.ctx != HELLO_CHANNEL {
             return Err(format_err!("First message wasn't a server hello?"));
         }
+        info!(
+            "Message from server: {}",
+            String::from_utf8_lossy(&hello_message.data)
+        );
 
         let (tx, rx) = mpsc::unbounded_channel();
 
@@ -219,11 +216,7 @@ impl Subscriber {
             HELLO_CHANNEL,
             "DEUCALION_CLIENT".as_bytes().into(),
         ))?;
-        tx.send(Payload {
-            op: MessageOps::Option,
-            ctx: filter,
-            data: Vec::new(),
-        })?;
+        tx.send(Payload { op: MessageOps::Option, ctx: filter, data: vec![] })?;
 
         let self_clone = self.clone();
         let msg_loop_task = tokio::spawn(async move {
