@@ -12,7 +12,7 @@ readme = "README.md"
 keywords = ["ffxiv", "windows", "dll-injection", "dll"]
 
 [dependencies]
-dll-syringe = { git = "https://github.com/fry/dll-syringe", rev = "0a8b18e" }
+dll-syringe = { git = "https://github.com/OpenByteDev/dll-syringe", rev = "285df45" }
 deucalion = { path = "../deucalion" }
 tokio = { version = "1.45.1", features = ["io-util", "sync", "rt"] }
 tokio-util = { version = "0.7.15", features = ["codec", "compat"] }
