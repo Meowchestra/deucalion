@@ -154,8 +154,8 @@ fn pause() {
 }
 
 unsafe extern "system" fn main(dll_base_addr: LPVOID) -> u32 {
+    #[cfg(debug_assertions)]
     unsafe {
-        #[cfg(debug_assertions)]
         consoleapi::AllocConsole();
     }
 

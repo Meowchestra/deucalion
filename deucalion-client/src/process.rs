@@ -14,6 +14,7 @@ use dll_syringe::{
 use log::debug;
 use sysinfo::ProcessesToUpdate;
 use winapi::{
+    ctypes::c_void,
     shared::winerror::ERROR_SUCCESS,
     um::{
         accctrl::SE_KERNEL_OBJECT,
@@ -135,7 +136,7 @@ pub fn copy_current_process_dacl_to_target(target_pid: usize) -> Result<()> {
 
     let ret = unsafe {
         SetSecurityInfo(
-            owned_handle.as_raw_handle(),
+            owned_handle.as_raw_handle() as *mut c_void,
             SE_KERNEL_OBJECT,
             DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION,
             ptr::null_mut(),

@@ -19,7 +19,7 @@ tokio-util = { version = "0.7.15", features = ["codec", "compat"] }
 tokio-retry = "0.3"
 futures = "0.3"
 sysinfo = "0.35.2"
-winapi = { version = "0.3", features = ["aclapi", "processthreadsapi"] }
+winapi = { version = "0.3", features = ["aclapi", "processthreadsapi", "securitybaseapi"] }
 anyhow = "1.0"
 log = "0.4"
 clap = { version = "4.5", features = ["derive"] }
