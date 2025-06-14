@@ -23,7 +23,6 @@ jobs:
     - name: Clippy
       run: |
         cargo clippy --future-incompat-report -- -D warnings
-        cargo report future-incompatibilities --id 1
 
     - name: Run tests
       run: cargo test --verbose
