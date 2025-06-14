@@ -14,7 +14,6 @@ use dll_syringe::{
 use log::debug;
 use sysinfo::ProcessesToUpdate;
 use winapi::{
-    ctypes::c_void,
     shared::winerror::ERROR_SUCCESS,
     um::{
         accctrl::SE_KERNEL_OBJECT,
@@ -130,13 +129,16 @@ pub fn copy_current_process_dacl_to_target(target_pid: usize) -> Result<()> {
         return Err(io::Error::last_os_error().into());
     }
 
-    let owned_handle = unsafe { OwnedHandle::from_raw_handle(handle) };
+    // FIX: Cast from winapi's handle type to std's handle type.
+    // The underlying pointer is the same, but the types are distinct.
+    let owned_handle = unsafe { OwnedHandle::from_raw_handle(handle as *mut _) };
 
     debug!("Setting the security info for the target process");
 
     let ret = unsafe {
         SetSecurityInfo(
-            owned_handle.as_raw_handle() as *mut c_void,
+            // FIX: Cast from std's handle type back to winapi's handle type.
+            owned_handle.as_raw_handle() as *mut _,
             SE_KERNEL_OBJECT,
             DACL_SECURITY_INFORMATION | UNPROTECTED_DACL_SECURITY_INFORMATION,
             ptr::null_mut(),
