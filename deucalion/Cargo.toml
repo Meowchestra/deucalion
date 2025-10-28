@@ -25,7 +25,7 @@ name = "deucalion"
 crate-type = ["rlib", "dylib"]
 
 [dependencies]
-tokio = { version = "1.47.1", features = [
+tokio = { version = "1.48.0", features = [
   "io-util",
   "sync",
   "rt",
@@ -37,7 +37,7 @@ tokio = { version = "1.47.1", features = [
 tokio-util = { version = "0.7.16", features = ["codec", "compat"] }
 futures = "0.3"
 anyhow = "1.0"
-thiserror = "2.0.12"
+thiserror = "2.0.17"
 bytes = "1"
 stream-cancel = "0.8.2"
 log = "0.4"
