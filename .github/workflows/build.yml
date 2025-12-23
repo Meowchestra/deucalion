@@ -29,3 +29,10 @@ jobs:
 
     #- name: Build bcryptprimitives.rs shim
     #  run: rustc shims/bcryptprimitives.rs -Copt-level=3 -Clto=fat --out-dir target/release
+
+    - name: Upload artifact
+      uses: actions/upload-artifact@v6
+      with:
+        name: deucalion
+        path: |
+          target/release/deucalion.dll
