@@ -35,7 +35,7 @@ const COMMIT_DIRTY: &str = env!("VERGEN_GIT_DIRTY");
 pub const RECV_SIG: &str = "E8 $ { ' } 4C 8B 4F 10 8B 47 1C 45";
 pub const SEND_SIG: &str = "40 53 56 48 83 EC 38 48 8B D9 48 8B F2 8B";
 pub const SEND_LOBBY_SIG: &str = "40 53 48 83 EC 20 44 8B 41 28";
-pub use hook::{CREATE_TARGET_SIG, disassemble_mov_instruction};
+pub use hook::infer_create_target_details;
 
 fn handle_payload(payload: rpc::Payload, hs: Arc<hook::State>) -> Result<()> {
     let hook_type = match payload.op {
@@ -67,7 +67,8 @@ fn auto_initialize_hooks(hs: &Arc<hook::State>) -> (bool, bool, bool, bool) {
     let r = initialize_hook_with_sig(hs, RECV_SIG, hook::HookType::Recv);
     let s = initialize_hook_with_sig(hs, SEND_SIG, hook::HookType::Send);
     let sl = initialize_hook_with_sig(hs, SEND_LOBBY_SIG, hook::HookType::SendLobby);
-    let ct = initialize_hook_with_sig(hs, CREATE_TARGET_SIG, hook::HookType::CreateTarget);
+    // CreateTarget hook uses its own initialization logic
+    let ct = initialize_hook_with_sig(hs, "", hook::HookType::CreateTarget);
     (r, s, sl, ct)
 }
 
