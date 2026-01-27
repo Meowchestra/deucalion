@@ -23,12 +23,13 @@ Deucalion only supports 64-bit versions of FFXIV using DX11.
 
 The following is the compatibility matrix for Deucalion:
 
-| FFXIV Version | Deucalion Version |
-| ------------- | ----------------- |
-| 6.x           | 0.9.x             |
-| 7.0-7.1x      | 1.1.x             |
-| 7.2x          | 1.2.x             |
-| 7.3x          | 1.4.x             |
+| FFXIV Version | Deucalion Version  |
+| ------------- | ------------------ |
+| 6.x           | 0.9.x              |
+| 7.0-7.1x      | 1.1.x              |
+| 7.2x          | 1.2.x              |
+| 7.3x-7.40     | 1.4.0 (deprecated) |
+| 7.3+          | 1.5.x              |
 
 
 ## Features
