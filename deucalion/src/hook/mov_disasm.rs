@@ -1,12 +1,12 @@
 use anyhow::{Result, bail};
 
 /// Register enum for the supported registers in mov instruction disassembly
-#[repr(usize)]
-#[derive(Debug, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Register {
-    Rbx = 0,
-    Rdi,
+    Rdx,
+    Rbx,
     Rsi,
+    Rdi,
     R12,
     R13,
     R14,
@@ -16,7 +16,7 @@ pub enum Register {
 /// Limited disassembler a 3-byte mov rxx, ryy instruction
 ///
 /// Returns (source_reg, dest_reg) for the instruction.
-/// Only supports registers rbx, rsi, rdi, r12-r15.
+/// Only supports registers rdx, rbx, rsi, rdi, r12-r15.
 pub fn disassemble_mov_instruction(bytes: &[u8]) -> Result<(Register, Register)> {
     if bytes.len() != 3 {
         bail!("Expected exactly 3 bytes, got {}", bytes.len());
@@ -63,6 +63,7 @@ fn map_register_code_with_rex(code: u8, rex: u8, is_src: bool) -> Result<Registe
     let extended_code = code + if rex_bit { 8 } else { 0 };
 
     match extended_code {
+        2 => Ok(Register::Rdx),
         3 => Ok(Register::Rbx),
         6 => Ok(Register::Rsi),
         7 => Ok(Register::Rdi),
@@ -86,6 +87,7 @@ mod tests {
     fn test_mov_instructions() {
         let test_cases = [
             // [rex, opcode, modrm], expected_result
+            ([0x48, 0x8B, 0xD7], (Register::Rdi, Register::Rdx)), // mov rdx, rdi
             ([0x48, 0x89, 0xF3], (Register::Rsi, Register::Rbx)), // mov rbx, rsi
             ([0x4D, 0x89, 0xEC], (Register::R13, Register::R12)), // mov r12, r13
             ([0x48, 0x8B, 0xFE], (Register::Rsi, Register::Rdi)), // mov rdi, rsi
