@@ -48,7 +48,7 @@ pelite = "0.10"
 memchr = "2"
 binary-layout = "4.0"
 dirs = "6.0"
-strum = "0.27"
+strum = "0.28"
 strum_macros = "0.28"
 crossbeam-channel = "0.5"
 
