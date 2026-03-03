@@ -31,7 +31,7 @@ jobs:
     #  run: rustc shims/bcryptprimitives.rs -Copt-level=3 -Clto=fat --out-dir target/release
 
     - name: Upload artifact
-      uses: actions/upload-artifact@v6
+      uses: actions/upload-artifact@v7
       with:
         name: deucalion
         path: |
