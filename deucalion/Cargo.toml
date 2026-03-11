@@ -25,7 +25,7 @@ name = "deucalion"
 crate-type = ["rlib", "dylib"]
 
 [dependencies]
-tokio = { version = "1.49.0", features = [
+tokio = { version = "1.50.0", features = [
   "io-util",
   "sync",
   "rt",
