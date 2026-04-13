@@ -76,7 +76,7 @@ jobs:
         path: artifacts
 
     - name: Release
-      uses: softprops/action-gh-release@v2
+      uses: softprops/action-gh-release@v3
       with:
         name: Deucalion ${{ github.ref_name }}
         body: "# CHANGELOG"
