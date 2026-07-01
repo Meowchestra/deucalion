@@ -13,7 +13,7 @@ keywords = ["ffxiv", "windows", "dll-injection", "dll"]
 
 [dependencies]
 deucalion = { path = "../deucalion" }
-tokio = { version = "1.52.0", features = ["rt", "macros"] }
+tokio = { version = "1.52.3", features = ["rt", "macros"] }
 tokio-util = { version = "0.7.18", features = ["codec", "compat"] }
 futures = "0.3"
 anyhow = "1.0"
