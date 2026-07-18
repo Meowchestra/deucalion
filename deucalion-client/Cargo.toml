@@ -14,7 +14,7 @@ keywords = ["ffxiv", "windows", "dll-injection", "dll"]
 [dependencies]
 dll-syringe = "0.17"
 deucalion = { path = "../deucalion" }
-tokio = { version = "1.52.3", features = ["io-util", "sync", "rt"] }
+tokio = { version = "1.53.0", features = ["io-util", "sync", "rt"] }
 tokio-util = { version = "0.7.18", features = ["codec", "compat"] }
 tokio-retry = "0.3"
 futures = "0.3"
