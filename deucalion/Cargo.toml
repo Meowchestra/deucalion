@@ -71,4 +71,4 @@ rand = "0.10.1"
 [build-dependencies]
 winres = "0.1"
 anyhow = "1.0"
-vergen-git2 = { version = "9", features = ["build"] }
+vergen-git2 = { version = "10", features = ["build"] }
